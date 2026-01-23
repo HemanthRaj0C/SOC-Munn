@@ -29,7 +29,7 @@ export interface Team {
   teamName: string;
   username: string;
   teamMembers: string[];
-  assignedPS: number;
+  assignedPS: number[];
   submissions: Submission[];
   totalScore?: number;
 }

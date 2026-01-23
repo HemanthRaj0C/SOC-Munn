@@ -10,7 +10,7 @@ export default function UserDashboard() {
   const { user, logout, loading: authLoading } = useAuth();
   const router = useRouter();
   const [teamName, setTeamName] = useState('');
-  const [assignedPS, setAssignedPS] = useState<number>(0);
+  const [assignedPS, setAssignedPS] = useState<number[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedPS, setSelectedPS] = useState<number | null>(null);
@@ -77,8 +77,6 @@ export default function UserDashboard() {
     );
   }
 
-  const submission = submissions.find(s => s.psNumber === assignedPS);
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -99,36 +97,42 @@ export default function UserDashboard() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <h2 className="text-3xl font-bold mb-8">Your Challenge</h2>
+        <h2 className="text-3xl font-bold mb-8">Your Challenges</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div
-            onClick={() => handleCardClick(assignedPS)}
-            className={`p-6 bg-white rounded-lg shadow-md cursor-pointer hover:shadow-lg transition ${
-              submission?.isCompleted ? 'opacity-60' : 'hover:scale-105'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold">Problem Statement {assignedPS}</h3>
-              {submission?.isCompleted && (
-                <span className="px-2 py-1 text-xs bg-green-500 text-white rounded">
-                  Completed
-                </span>
-              )}
-              {submission?.hasStarted && !submission?.isCompleted && (
-                <span className="px-2 py-1 text-xs bg-yellow-500 text-white rounded">
-                  In Progress
-                </span>
-              )}
-            </div>
-            <p className="text-gray-600">
-              {submission?.isCompleted
-                ? 'Challenge completed!'
-                : submission?.hasStarted
-                ? 'Continue your challenge'
-                : 'Click to start'}
-            </p>
-          </div>
+          {assignedPS.map((psNumber) => {
+            const submission = submissions.find(s => s.psNumber === psNumber);
+            return (
+              <div
+                key={psNumber}
+                onClick={() => handleCardClick(psNumber)}
+                className={`p-6 bg-white rounded-lg shadow-md cursor-pointer hover:shadow-lg transition ${
+                  submission?.isCompleted ? 'opacity-60' : 'hover:scale-105'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold">Problem Statement {psNumber}</h3>
+                  {submission?.isCompleted && (
+                    <span className="px-2 py-1 text-xs bg-green-500 text-white rounded">
+                      Completed
+                    </span>
+                  )}
+                  {submission?.hasStarted && !submission?.isCompleted && (
+                    <span className="px-2 py-1 text-xs bg-yellow-500 text-white rounded">
+                      In Progress
+                    </span>
+                  )}
+                </div>
+                <p className="text-gray-600">
+                  {submission?.isCompleted
+                    ? 'Challenge completed!'
+                    : submission?.hasStarted
+                    ? 'Continue your challenge'
+                    : 'Click to start'}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </div>
 

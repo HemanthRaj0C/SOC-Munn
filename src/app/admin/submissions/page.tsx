@@ -191,82 +191,84 @@ export default function AdminSubmissions() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {teams.map((team) => {
-                const submission = team.submissions.find(s => s.psNumber === team.assignedPS);
-                const scoreKey = `${team.teamId}-${team.assignedPS}`;
-                
-                return (
-                  <tr key={team.teamId}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{team.teamName}</div>
-                      <div className="text-sm text-gray-500">{team.teamMembers.join(', ')}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      PS {team.assignedPS}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {submission?.isCompleted ? (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          Completed
-                        </span>
-                      ) : submission?.hasStarted ? (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                          In Progress
-                        </span>
-                      ) : (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                          Not Started
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {submission?.completedTime
-                        ? new Date(submission.completedTime).toLocaleString()
-                        : '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                      {formatTime(submission?.timeTaken || null)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {submission?.isCompleted ? (
-                        <button
-                          onClick={() => viewSubmission(team, submission)}
-                          className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                        >
-                          View
-                        </button>
-                      ) : (
-                        <span className="text-sm text-gray-400">No submission</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {submission?.isCompleted ? (
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={scores[scoreKey] || 0}
-                          onChange={(e) => handleScoreChange(team.teamId, team.assignedPS, e.target.value)}
-                          className="w-20 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                          disabled={!submission.isCompleted}
-                        />
-                      ) : (
-                        <span className="text-sm text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {submission?.isCompleted && (
-                        <button
-                          onClick={() => handleScoreSubmit(team.teamId, team.assignedPS)}
-                          className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
-                        >
-                          Save
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+              {teams.flatMap((team) => 
+                team.assignedPS.map((psNumber) => {
+                  const submission = team.submissions.find(s => s.psNumber === psNumber);
+                  const scoreKey = `${team.teamId}-${psNumber}`;
+                  
+                  return (
+                    <tr key={`${team.teamId}-${psNumber}`}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{team.teamName}</div>
+                        <div className="text-sm text-gray-500">{team.teamMembers.join(', ')}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        PS {psNumber}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {submission?.isCompleted ? (
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            Completed
+                          </span>
+                        ) : submission?.hasStarted ? (
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                            In Progress
+                          </span>
+                        ) : (
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                            Not Started
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {submission?.completedTime
+                          ? new Date(submission.completedTime).toLocaleString()
+                          : '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                        {formatTime(submission?.timeTaken || null)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {submission?.isCompleted ? (
+                          <button
+                            onClick={() => viewSubmission(team, submission)}
+                            className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                          >
+                            View
+                          </button>
+                        ) : (
+                          <span className="text-sm text-gray-400">No submission</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {submission?.isCompleted ? (
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={scores[scoreKey] || 0}
+                            onChange={(e) => handleScoreChange(team.teamId, psNumber, e.target.value)}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                            disabled={!submission.isCompleted}
+                          />
+                        ) : (
+                          <span className="text-sm text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {submission?.isCompleted && (
+                          <button
+                            onClick={() => handleScoreSubmit(team.teamId, psNumber)}
+                            className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                          >
+                            Save
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

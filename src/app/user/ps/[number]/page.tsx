@@ -64,9 +64,10 @@ export default function PSPage({ params }: { params: Promise<{ number: string }>
     } catch (error: any) {
       console.error('Failed to fetch PS:', error);
       
-      // Check if it's a 403 (not assigned to this PS)
+      // Check if it's a 403 error
       if (error.response?.status === 403) {
-        alert('You are not assigned to Problem Statement ' + num);
+        const message = error.response?.data?.message || 'Access denied';
+        alert(message);
         router.push('/user/dashboard');
       } else {
         // Other errors, redirect to dashboard
