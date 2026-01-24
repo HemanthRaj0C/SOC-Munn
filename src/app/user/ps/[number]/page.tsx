@@ -13,6 +13,80 @@ import Paragraph from '@editorjs/paragraph';
 import Code from '@editorjs/code';
 import { LoaderFive } from '@/components/ui/loader';
 import { toast, Toaster } from 'sonner';
+import Counter from '@/components/Counter';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
+import { Clock, FileText, Send, ArrowLeft } from 'lucide-react';
+
+const BottomGradient = () => {
+  return (
+    <>
+      <span className="absolute inset-x-0 -bottom-px block h-px w-full bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-0 transition duration-500 group-hover/btn:opacity-100" />
+      <span className="absolute inset-x-10 -bottom-px mx-auto block h-px w-1/2 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-0 blur-sm transition duration-500 group-hover/btn:opacity-100" />
+    </>
+  );
+};
+
+// Timer component with HH:MM:SS display
+const TimerDisplay = ({ elapsedTime }: { elapsedTime: number }) => {
+  const hours = Math.floor(elapsedTime / 3600);
+  const minutes = Math.floor((elapsedTime % 3600) / 60);
+  const seconds = elapsedTime % 60;
+
+  return (
+    <div className="flex items-center gap-1">
+      <div className="flex items-center">
+        <Counter 
+          value={hours} 
+          fontSize={20}
+          padding={2}
+          gap={1}
+          places={[10, 1]}
+          horizontalPadding={4}
+          borderRadius={4}
+          textColor="#60a5fa"
+          fontWeight="700"
+          gradientHeight={0}
+        />
+      </div>
+      <span className="text-blue-400 font-bold text-lg">:</span>
+      <div className="flex items-center">
+        <Counter 
+          value={minutes} 
+          fontSize={20}
+          padding={2}
+          gap={1}
+          places={[10, 1]}
+          horizontalPadding={4}
+          borderRadius={4}
+          textColor="#60a5fa"
+          fontWeight="700"
+          gradientHeight={0}
+        />
+      </div>
+      <span className="text-blue-400 font-bold text-lg">:</span>
+      <div className="flex items-center">
+        <Counter 
+          value={seconds} 
+          fontSize={20}
+          padding={2}
+          gap={1}
+          places={[10, 1]}
+          horizontalPadding={4}
+          borderRadius={4}
+          textColor="#60a5fa"
+          fontWeight="700"
+          gradientHeight={0}
+        />
+      </div>
+    </div>
+  );
+};
 
 export default function PSPage({ params }: { params: Promise<{ number: string }> }) {
   const { user, loading: authLoading } = useAuth();
@@ -152,68 +226,126 @@ export default function PSPage({ params }: { params: Promise<{ number: string }>
   return (
     <>
       <Toaster position="top-right" theme="dark" richColors />
-      <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Problem Statement {psNumber}</h1>
-          <div className="flex items-center gap-4">
-            <div className="px-4 py-2 bg-blue-100 text-blue-800 rounded-lg font-mono">
-              {formatTime(elapsedTime)}
-            </div>
-            <button
-              onClick={() => router.push('/user/dashboard')}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Back to Dashboard
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-12rem)]">
-          {/* Problem Description */}
-          <div className="bg-white p-6 rounded-lg shadow-md overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-4">{ps.title}</h2>
-            <div className="prose max-w-none">
-              <p className="text-gray-700 whitespace-pre-wrap">{ps.description}</p>
-              {ps.details && (
-                <div className="mt-4">
-                  <h3 className="font-semibold">Details:</h3>
-                  <pre className="mt-2 p-4 bg-gray-100 rounded">{JSON.stringify(ps.details, null, 2)}</pre>
+      <div className="min-h-screen">
+        {/* Header */}
+        <nav className="sticky top-0 z-50 bg-neutral-900/80 backdrop-blur-xl border-b border-neutral-800/50 rounded-b-3xl">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <h1 className="text-lg font-semibold text-white">Problem Statement {psNumber}</h1>
+              
+              <div className="flex items-center gap-4">
+                {/* Timer */}
+                <div className="flex items-center gap-3 px-4 py-2 bg-neutral-800/50 border border-neutral-700/50 rounded-xl">
+                  <Clock className="w-4 h-4 text-blue-400" />
+                  <TimerDisplay elapsedTime={elapsedTime} />
                 </div>
-              )}
+                
+                <button
+                  onClick={() => router.push('/user/dashboard')}
+                  className="group/btn relative flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-neutral-800/50 hover:bg-neutral-700/50 border border-neutral-700/50 text-neutral-300 hover:text-white transition-all"
+                >
+                  <span className="hidden sm:inline">Back to</span>
+                  <span>Dashboard</span>
+                  <BottomGradient />
+                </button>
+              </div>
             </div>
           </div>
+        </nav>
 
-          {/* Editor and Preview */}
-          <div className="flex flex-col gap-4">
-            {/* Editor */}
-            <div className="bg-white p-6 rounded-lg shadow-md flex-1 overflow-y-auto">
-              <h3 className="text-xl font-bold mb-4">Your Report</h3>
-              <div id="editorjs" className="prose max-w-none"></div>
-            </div>
+        {/* Main Content */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-32">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-8rem)]">
+            {/* Problem Description */}
+            <Card className="bg-neutral-900/50 border-neutral-800/50 backdrop-blur-sm overflow-hidden flex flex-col">
+              <CardHeader className="border-b border-neutral-800/50 pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <CardTitle className="text-lg text-white">{ps.title}</CardTitle>
+                      <p className="text-xs text-neutral-500 mt-0.5">Problem Statement</p>
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <div className="flex-1 overflow-hidden">
+                <ScrollArea className="h-full">
+                  <div className="prose prose-invert prose-sm max-w-none py-4 px-6">
+                    <p className="text-neutral-300 whitespace-pre-wrap leading-relaxed text-sm">{ps.description}</p>
+                    {ps.details && (
+                      <div className="mt-6">
+                        <h4 className="text-sm font-semibold text-neutral-200 mb-3 flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                          Incident Details
+                        </h4>
+                        <div className="bg-neutral-950/50 border border-neutral-800/50 rounded-lg p-4 overflow-x-auto">
+                          <pre className="text-neutral-400 text-xs font-mono">{JSON.stringify(ps.details, null, 2)}</pre>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            </Card>
 
-            {/* Submit Button */}
-            <div className="bg-white p-4 rounded-lg shadow-md">
-              <button
-                onClick={handleSubmit}
-                disabled={isCompleted || submitting}
-                className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-              >
-                {isCompleted ? 'Already Submitted' : submitting ? 'Submitting...' : 'Submit Report'}
-              </button>
-              {isCompleted && (
-                <p className="text-center text-sm text-gray-500 mt-2">
-                  You have already submitted this challenge
-                </p>
-              )}
+            {/* Editor Section */}
+            <div className="flex flex-col gap-4">
+              <Card className="bg-neutral-900/50 border-neutral-800/50 backdrop-blur-sm flex-1 overflow-hidden flex flex-col">
+                <CardHeader className="border-b border-neutral-800/50 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <CardTitle className="text-lg text-white">Your Report</CardTitle>
+                      <p className="text-xs text-neutral-500 mt-0.5">Write your analysis and findings</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <div className="flex-1 overflow-hidden">
+                  <ScrollArea className="h-full">
+                    <div id="editorjs" className="prose prose-invert prose-sm max-w-none min-h-[200px] py-4 px-6"></div>
+                  </ScrollArea>
+                </div>
+              </Card>
+
+              {/* Submit Section */}
+              <Card className="bg-neutral-900/50 border-neutral-800/50 backdrop-blur-sm">
+                <CardContent className="py-4 px-6">
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={isCompleted || submitting}
+                    className={cn(
+                      "w-full h-11 text-sm font-semibold rounded-lg transition-all duration-300",
+                      isCompleted 
+                        ? "bg-neutral-800 text-neutral-500 cursor-not-allowed border border-neutral-700" 
+                        : "bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30"
+                    )}
+                  >
+                    {isCompleted ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-neutral-500"></span>
+                        Already Submitted
+                      </span>
+                    ) : submitting ? (
+                      <span className="flex items-center gap-2">
+                        <Spinner className="size-4" />
+                        Submitting Report...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Send className="w-4 h-4" />
+                        Submit Report
+                      </span>
+                    )}
+                  </Button>
+                  {isCompleted && (
+                    <p className="text-center text-xs text-neutral-500 mt-3">
+                      You have already submitted this challenge
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
-      </div>
       </div>
     </>
   );
