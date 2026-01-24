@@ -15,6 +15,15 @@ export default function AdminSubmissions() {
   const [loading, setLoading] = useState(true);
   const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
   const [scores, setScores] = useState<{ [key: string]: number }>({});
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  // Update current time every second for in-progress calculations
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -90,6 +99,12 @@ export default function AdminSubmissions() {
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const calculateInProgressTime = (startTime: string) => {
+    const start = new Date(startTime).getTime();
+    const elapsed = currentTime - start;
+    return elapsed;
+  };
+
   const renderEditorJSContent = (content: any) => {
     if (!content || !content.blocks) return <p className="text-gray-500">No content</p>;
 
@@ -103,9 +118,11 @@ export default function AdminSubmissions() {
         case 'list':
           const ListTag = block.data.style === 'ordered' ? 'ol' : 'ul';
           return (
-            <ListTag key={index} className="list-disc ml-6 my-2">
-              {block.data.items.map((item: string, i: number) => (
-                <li key={i}>{item}</li>
+            <ListTag key={index} className={block.data.style === 'ordered' ? 'list-decimal ml-6 my-2' : 'list-disc ml-6 my-2'}>
+              {block.data.items.map((item: any, i: number) => (
+                <li key={i}>
+                  {typeof item === 'string' ? item : item.content || JSON.stringify(item)}
+                </li>
               ))}
             </ListTag>
           );
@@ -116,7 +133,7 @@ export default function AdminSubmissions() {
             </pre>
           );
         default:
-          return <p key={index} className="my-2">{JSON.stringify(block.data)}</p>;
+          return <p key={index} className="my-2 text-gray-600">{JSON.stringify(block.data)}</p>;
       }
     });
   };
@@ -226,7 +243,12 @@ export default function AdminSubmissions() {
                           : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                        {formatTime(submission?.timeTaken || null)}
+                        {submission?.isCompleted 
+                          ? formatTime(submission?.timeTaken || null)
+                          : submission?.hasStarted && submission?.startTime
+                          ? <span className="text-yellow-600">{formatTime(calculateInProgressTime(submission.startTime))}</span>
+                          : '-'
+                        }
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {submission?.isCompleted ? (
