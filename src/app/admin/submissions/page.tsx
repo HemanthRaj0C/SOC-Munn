@@ -1,31 +1,50 @@
-//@ts-nocheck
-
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { Team } from '@/types';
 import { LoaderFive } from '@/components/ui/loader';
 import { toast, Toaster } from 'sonner';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
+import { Check, X, Trophy, Droplet, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+
+interface QuestionProgress {
+  isCompleted: boolean;
+  score: number;
+  attempts: number;
+  completedAt: string | null;
+  isFirstBlood: boolean;
+}
+
+interface PSProgress {
+  totalScore: number;
+  questions: { [key: number]: QuestionProgress };
+}
+
+interface Team {
+  teamId: string;
+  teamName: string;
+  username: string;
+  teamMembers: string[];
+  totalScore: number;
+  psProgress: { [key: number]: PSProgress };
+}
 
 export default function AdminSubmissions() {
   const { user, logout, loading: authLoading } = useAuth();
   const router = useRouter();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
-  const [scores, setScores] = useState<{ [key: string]: number }>({});
-  const [currentTime, setCurrentTime] = useState(Date.now());
-
-  // Update current time every second for in-progress calculations
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -42,107 +61,42 @@ export default function AdminSubmissions() {
     try {
       const response = await api.get('/admin/submissions');
       setTeams(response.data);
-      
-      // Initialize scores
-      const initialScores: { [key: string]: number } = {};
-      response.data.forEach((team: Team) => {
-        team.submissions.forEach(sub => {
-          const key = `${team.teamId}-${sub.psNumber}`;
-          initialScores[key] = sub.score || 0;
-        });
-      });
-      setScores(initialScores);
     } catch (error) {
       console.error('Failed to fetch submissions:', error);
+      toast.error('Failed to load submissions');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleScoreChange = (teamId: string, psNumber: number, value: string) => {
-    const key = `${teamId}-${psNumber}`;
-    setScores({ ...scores, [key]: parseInt(value) || 0 });
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleString();
   };
 
-  const handleScoreSubmit = async (teamId: string, psNumber: number) => {
-    const key = `${teamId}-${psNumber}`;
-    const score = scores[key] || 0;
-
-    try {
-      await api.post(`/admin/score/${teamId}/${psNumber}`, { score });
-      toast.success('Score updated successfully!');
-      fetchSubmissions(); // Refresh data
-    } catch (error) {
-      console.error('Failed to update score:', error);
-      toast.error('Failed to update score');
-    }
-  };
-
-  const viewSubmission = (team: Team, submission: any) => {
-    setSelectedSubmission({
-      teamName: team.teamName,
-      psNumber: submission.psNumber,
-      content: submission.submissionContent,
-      timeTaken: submission.timeTaken,
-      completedTime: submission.completedTime
+  const getCompletedCount = (team: Team) => {
+    let count = 0;
+    Object.values(team.psProgress).forEach(ps => {
+      Object.values(ps.questions).forEach(q => {
+        if (q.isCompleted) count++;
+      });
     });
+    return count;
   };
 
-  const closeModal = () => {
-    setSelectedSubmission(null);
-  };
-
-  const formatTime = (milliseconds: number | null) => {
-    if (!milliseconds) return '-';
-    const seconds = Math.floor(milliseconds / 1000);
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const calculateInProgressTime = (startTime: string) => {
-    const start = new Date(startTime).getTime();
-    const elapsed = currentTime - start;
-    return elapsed;
-  };
-
-  const renderEditorJSContent = (content: any) => {
-    if (!content || !content.blocks) return <p className="text-gray-500">No content</p>;
-
-    return content.blocks.map((block: any, index: number) => {
-      switch (block.type) {
-        case 'header':
-          const HeaderTag = `h${block.data.level}` as keyof JSX.IntrinsicElements;
-          return <HeaderTag key={index} className="font-bold my-2">{block.data.text}</HeaderTag>;
-        case 'paragraph':
-          return <p key={index} className="my-2">{block.data.text}</p>;
-        case 'list':
-          const ListTag = block.data.style === 'ordered' ? 'ol' : 'ul';
-          return (
-            <ListTag key={index} className={block.data.style === 'ordered' ? 'list-decimal ml-6 my-2' : 'list-disc ml-6 my-2'}>
-              {block.data.items.map((item: any, i: number) => (
-                <li key={i}>
-                  {typeof item === 'string' ? item : item.content || JSON.stringify(item)}
-                </li>
-              ))}
-            </ListTag>
-          );
-        case 'code':
-          return (
-            <pre key={index} className="bg-gray-100 p-4 rounded my-2 overflow-x-auto">
-              <code>{block.data.code}</code>
-            </pre>
-          );
-        default:
-          return <p key={index} className="my-2 text-gray-600">{JSON.stringify(block.data)}</p>;
-      }
+  const getFirstBloodCount = (team: Team) => {
+    let count = 0;
+    Object.values(team.psProgress).forEach(ps => {
+      Object.values(ps.questions).forEach(q => {
+        if (q.isFirstBlood) count++;
+      });
     });
+    return count;
   };
 
   if (loading || authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-black">
         <LoaderFive text="Loading" />
       </div>
     );
@@ -151,195 +105,211 @@ export default function AdminSubmissions() {
   return (
     <>
       <Toaster position="top-right" theme="dark" richColors />
-      <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Submissions & Grading</h1>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push('/admin/scoreboard')}
-              className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
-            >
-              View Scoreboard
-            </button>
-            <button
-              onClick={fetchSubmissions}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Refresh
-            </button>
-            <button
-              onClick={logout}
-              className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Team
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  PS
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Submitted At
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Time Taken
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Submission
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Score
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {teams.flatMap((team) => 
-                team.assignedPS.map((psNumber) => {
-                  const submission = team.submissions.find(s => s.psNumber === psNumber);
-                  const scoreKey = `${team.teamId}-${psNumber}`;
-                  
-                  return (
-                    <tr key={`${team.teamId}-${psNumber}`}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{team.teamName}</div>
-                        <div className="text-sm text-gray-500">{team.teamMembers.join(', ')}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        PS {psNumber}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {submission?.isCompleted ? (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            Completed
-                          </span>
-                        ) : submission?.hasStarted ? (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                            In Progress
-                          </span>
-                        ) : (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                            Not Started
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {submission?.completedTime
-                          ? new Date(submission.completedTime).toLocaleString()
-                          : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                        {submission?.isCompleted 
-                          ? formatTime(submission?.timeTaken || null)
-                          : submission?.hasStarted && submission?.startTime
-                          ? <span className="text-yellow-600">{formatTime(calculateInProgressTime(submission.startTime))}</span>
-                          : '-'
-                        }
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {submission?.isCompleted ? (
-                          <button
-                            onClick={() => viewSubmission(team, submission)}
-                            className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                          >
-                            View
-                          </button>
-                        ) : (
-                          <span className="text-sm text-gray-400">No submission</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {submission?.isCompleted ? (
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={scores[scoreKey] || 0}
-                            onChange={(e) => handleScoreChange(team.teamId, psNumber, e.target.value)}
-                            className="w-20 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                            disabled={!submission.isCompleted}
-                          />
-                        ) : (
-                          <span className="text-sm text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {submission?.isCompleted && (
-                          <button
-                            onClick={() => handleScoreSubmit(team.teamId, psNumber)}
-                            className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
-                          >
-                            Save
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Modal for viewing submission */}
-      {selectedSubmission && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-6 border-b">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="text-2xl font-bold">{selectedSubmission.teamName}</h2>
-                  <p className="text-gray-600">Problem Statement {selectedSubmission.psNumber}</p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Completed: {new Date(selectedSubmission.completedTime).toLocaleString()}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Time Taken: {formatTime(selectedSubmission.timeTaken)}
-                  </p>
-                </div>
+      <div className="min-h-screen bg-black">
+        {/* Header */}
+        <nav className="sticky top-0 z-50 bg-neutral-900/80 backdrop-blur-md border-b border-neutral-800">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <h1 className="text-2xl font-bold text-white">Submissions & Progress</h1>
+              <div className="flex items-center gap-3">
                 <button
-                  onClick={closeModal}
-                  className="text-gray-400 hover:text-gray-600 text-3xl font-bold"
+                  onClick={() => router.push('/admin/scoreboard')}
+                  className="px-4 py-2 text-sm bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg hover:from-green-500 hover:to-green-400 transition-all"
                 >
-                  ×
+                  Scoreboard
+                </button>
+                <button
+                  onClick={fetchSubmissions}
+                  className="px-4 py-2 text-sm bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-400 transition-all"
+                >
+                  Refresh
+                </button>
+                <button
+                  onClick={logout}
+                  className="px-4 py-2 text-sm bg-gradient-to-r from-red-600 to-red-500 text-white rounded-lg hover:from-red-500 hover:to-red-400 transition-all"
+                >
+                  Logout
                 </button>
               </div>
             </div>
-            <div className="p-6 overflow-y-auto flex-1">
-              <div className="prose max-w-none">
-                {renderEditorJSContent(selectedSubmission.content)}
-              </div>
-            </div>
-            <div className="p-6 border-t">
-              <button
-                onClick={closeModal}
-                className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-              >
-                Close
-              </button>
-            </div>
           </div>
+        </nav>
+
+        {/* Main Content */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <Card className="bg-neutral-900/50 border-neutral-800">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-blue-500/20 rounded-lg">
+                    <Trophy className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-neutral-400">Total Teams</p>
+                    <p className="text-2xl font-bold text-white">{teams.length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-neutral-900/50 border-neutral-800">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-green-500/20 rounded-lg">
+                    <Check className="w-6 h-6 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-neutral-400">Total Questions Solved</p>
+                    <p className="text-2xl font-bold text-white">
+                      {teams.reduce((acc, team) => acc + getCompletedCount(team), 0)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-neutral-900/50 border-neutral-800">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-red-500/20 rounded-lg">
+                    <Droplet className="w-6 h-6 text-red-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-neutral-400">First Bloods Claimed</p>
+                    <p className="text-2xl font-bold text-white">
+                      {teams.reduce((acc, team) => acc + getFirstBloodCount(team), 0)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Teams List */}
+          <div className="space-y-4">
+            {teams.map((team, index) => (
+              <Collapsible
+                key={team.teamId}
+                open={expandedTeam === team.teamId}
+                onOpenChange={(open) => setExpandedTeam(open ? team.teamId : null)}
+              >
+                <Card className="bg-neutral-900/50 border-neutral-800">
+                  <CollapsibleTrigger asChild>
+                    <CardHeader className="cursor-pointer hover:bg-neutral-800/50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          {/* Rank Badge */}
+                          <div className={cn(
+                            "w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg",
+                            index === 0 ? "bg-yellow-500/20 text-yellow-400" :
+                            index === 1 ? "bg-neutral-400/20 text-neutral-300" :
+                            index === 2 ? "bg-orange-500/20 text-orange-400" :
+                            "bg-neutral-800 text-neutral-400"
+                          )}>
+                            {index + 1}
+                          </div>
+                          
+                          <div>
+                            <CardTitle className="text-lg text-white">{team.teamName}</CardTitle>
+                            <p className="text-sm text-neutral-500">{team.teamMembers?.join(', ') || team.username}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-6">
+                          {/* Stats */}
+                          <div className="flex items-center gap-4 text-sm">
+                            <div className="text-center">
+                              <p className="text-neutral-400">Solved</p>
+                              <p className="text-white font-bold">{getCompletedCount(team)}/72</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-neutral-400">First Bloods</p>
+                              <p className="text-red-400 font-bold">{getFirstBloodCount(team)}</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-neutral-400">Score</p>
+                              <p className="text-cyan-400 font-bold">{team.totalScore}</p>
+                            </div>
+                          </div>
+                          
+                          {expandedTeam === team.teamId ? (
+                            <ChevronUp className="w-5 h-5 text-neutral-400" />
+                          ) : (
+                            <ChevronDown className="w-5 h-5 text-neutral-400" />
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent>
+                    <CardContent className="border-t border-neutral-800 pt-6">
+                      {/* PS Grid */}
+                      <div className="space-y-6">
+                        {[1, 2, 3, 4, 5, 6].map(psNum => {
+                          const psProgress = team.psProgress[psNum];
+                          return (
+                            <div key={psNum} className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-medium text-white">PS {psNum}</h4>
+                                <Badge variant="outline" className="text-xs border-neutral-700 text-neutral-400">
+                                  {psProgress?.totalScore || 0} pts
+                                </Badge>
+                              </div>
+                              
+                              {/* Questions Grid */}
+                              <div className="grid grid-cols-12 gap-2">
+                                {[...Array(12)].map((_, qIndex) => {
+                                  const question = psProgress?.questions?.[qIndex];
+                                  const isCompleted = question?.isCompleted;
+                                  const isFirstBlood = question?.isFirstBlood;
+                                  
+                                  return (
+                                    <div
+                                      key={qIndex}
+                                      className={cn(
+                                        "relative aspect-square rounded-md flex items-center justify-center text-xs font-bold transition-all",
+                                        isCompleted 
+                                          ? isFirstBlood 
+                                            ? "bg-red-500/20 text-red-400 border border-red-500/50" 
+                                            : "bg-green-500/20 text-green-400 border border-green-500/50"
+                                          : question?.attempts && question.attempts > 0
+                                            ? "bg-yellow-500/10 text-yellow-500 border border-yellow-500/30"
+                                            : "bg-neutral-800/50 text-neutral-500 border border-neutral-700/50"
+                                      )}
+                                      title={`Q${qIndex + 1}: ${isCompleted ? `Solved${isFirstBlood ? ' (First Blood!)' : ''} +${question?.score}pts` : question?.attempts ? `${question.attempts} attempts` : 'Not attempted'}`}
+                                    >
+                                      {isCompleted ? (
+                                        isFirstBlood ? (
+                                          <Droplet className="w-3 h-3" />
+                                        ) : (
+                                          <Check className="w-3 h-3" />
+                                        )
+                                      ) : (
+                                        qIndex + 1
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+            ))}
+          </div>
+
+          {teams.length === 0 && (
+            <Card className="bg-neutral-900/50 border-neutral-800">
+              <CardContent className="py-12 text-center">
+                <p className="text-neutral-400">No teams found</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
-      )}
       </div>
     </>
   );

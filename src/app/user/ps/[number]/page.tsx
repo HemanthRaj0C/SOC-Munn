@@ -1,27 +1,33 @@
-// @ts-nocheck
-
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
-import EditorJS from '@editorjs/editorjs';
-import Header from '@editorjs/header';
-import List from '@editorjs/list';
-import Paragraph from '@editorjs/paragraph';
-import Code from '@editorjs/code';
 import { LoaderFive } from '@/components/ui/loader';
 import { toast, Toaster } from 'sonner';
-import Counter from '@/components/Counter';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Clock, FileText, Send, ArrowLeft } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  Check, 
+  X, 
+  HelpCircle, 
+  ChevronDown, 
+  ChevronUp,
+  Droplet,
+  Trophy
+} from 'lucide-react';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 const BottomGradient = () => {
   return (
@@ -32,74 +38,38 @@ const BottomGradient = () => {
   );
 };
 
-// Timer component with HH:MM:SS display
-const TimerDisplay = ({ elapsedTime }: { elapsedTime: number }) => {
-  const hours = Math.floor(elapsedTime / 3600);
-  const minutes = Math.floor((elapsedTime % 3600) / 60);
-  const seconds = elapsedTime % 60;
+interface Question {
+  index: number;
+  question: string;
+  hint: string;
+  placeholder: string;
+  isCompleted: boolean;
+  score: number;
+  attempts: number;
+  completedAt: string | null;
+  isFirstBlood: boolean;
+}
 
-  return (
-    <div className="flex items-center gap-1">
-      <div className="flex items-center">
-        <Counter 
-          value={hours} 
-          fontSize={20}
-          padding={2}
-          gap={1}
-          places={[10, 1]}
-          horizontalPadding={4}
-          borderRadius={4}
-          textColor="#60a5fa"
-          fontWeight="700"
-          gradientHeight={0}
-        />
-      </div>
-      <span className="text-blue-400 font-bold text-lg">:</span>
-      <div className="flex items-center">
-        <Counter 
-          value={minutes} 
-          fontSize={20}
-          padding={2}
-          gap={1}
-          places={[10, 1]}
-          horizontalPadding={4}
-          borderRadius={4}
-          textColor="#60a5fa"
-          fontWeight="700"
-          gradientHeight={0}
-        />
-      </div>
-      <span className="text-blue-400 font-bold text-lg">:</span>
-      <div className="flex items-center">
-        <Counter 
-          value={seconds} 
-          fontSize={20}
-          padding={2}
-          gap={1}
-          places={[10, 1]}
-          horizontalPadding={4}
-          borderRadius={4}
-          textColor="#60a5fa"
-          fontWeight="700"
-          gradientHeight={0}
-        />
-      </div>
-    </div>
-  );
-};
+interface PSData {
+  psNumber: number;
+  title: string;
+  description: string;
+  questions: Question[];
+  totalScore: number;
+}
 
 export default function PSPage({ params }: { params: Promise<{ number: string }> }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const editorRef = useRef<EditorJS | null>(null);
   const [psNumber, setPsNumber] = useState<number>(0);
-  const [ps, setPs] = useState<any>(null);
+  const [ps, setPs] = useState<PSData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
+  const [answers, setAnswers] = useState<{ [key: number]: string }>({});
+  const [submittingQuestion, setSubmittingQuestion] = useState<number | null>(null);
+  const [openQuestion, setOpenQuestion] = useState<number | null>(0);
+  const [showHints, setShowHints] = useState<{ [key: number]: boolean }>({});
 
   useEffect(() => {
-    // Don't do anything while auth is loading
     if (authLoading) return;
     
     params.then(resolvedParams => {
@@ -115,99 +85,85 @@ export default function PSPage({ params }: { params: Promise<{ number: string }>
     });
   }, [params, user, authLoading, router]);
 
-  useEffect(() => {
-    if (ps?.submission?.hasStarted && !ps?.submission?.isCompleted) {
-      const interval = setInterval(() => {
-        const start = new Date(ps.submission.startTime).getTime();
-        const now = new Date().getTime();
-        setElapsedTime(Math.floor((now - start) / 1000));
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }
-  }, [ps]);
-
-  useEffect(() => {
-    if (ps && !editorRef.current) {
-      initEditor();
-    }
-  }, [ps]);
-
   const fetchPS = async (num: number) => {
     try {
       const response = await api.get(`/user/ps/${num}`);
       setPs(response.data);
+      
+      // Open first unanswered question
+      const firstUnanswered = response.data.questions.findIndex((q: Question) => !q.isCompleted);
+      setOpenQuestion(firstUnanswered >= 0 ? firstUnanswered : null);
+      
       setLoading(false);
     } catch (error: any) {
       console.error('Failed to fetch PS:', error);
-      
-      // Check if it's a 403 error
-      if (error.response?.status === 403) {
-        const message = error.response?.data?.message || 'Access denied';
-        router.push(`/user/dashboard?error=${encodeURIComponent(message)}`);
-      } else {
-        // Other errors, redirect to dashboard
-        router.push(`/user/dashboard?error=${encodeURIComponent('Failed to load problem statement')}`);
-      }
-      // Don't set loading to false here - keep showing loader until redirect completes
+      const message = error.response?.data?.message || 'Failed to load problem statement';
+      router.push(`/user/dashboard?error=${encodeURIComponent(message)}`);
     }
   };
 
-  const initEditor = () => {
-    editorRef.current = new EditorJS({
-      holder: 'editorjs',
-      tools: {
-        header: Header,
-        list: List,
-        paragraph: {
-          class: Paragraph,
-          inlineToolbar: true,
-        },
-        code: Code,
-      },
-      placeholder: 'Write your report here...',
-    });
-  };
+  const handleSubmitAnswer = async (questionIndex: number) => {
+    const answer = answers[questionIndex]?.trim();
+    if (!answer) {
+      toast.error('Please enter an answer');
+      return;
+    }
 
-  const handleSubmit = async () => {
-    if (!editorRef.current) return;
-    
-    // Prevent multiple submissions (race condition)
-    if (submitting) return;
-
+    setSubmittingQuestion(questionIndex);
     try {
-      setSubmitting(true);
-      const content = await editorRef.current.save();
+      const response = await api.post(`/user/ps/${psNumber}/check/${questionIndex}`, { answer });
       
-      // Client-side size check for better UX (5MB limit)
-      const contentSize = JSON.stringify(content).length;
-      const MAX_SIZE = 5 * 1024 * 1024; // 5MB
-      if (contentSize > MAX_SIZE) {
-        toast.warning('Your submission is too large. Please reduce the content size.');
-        setSubmitting(false);
-        return;
+      // Update local state with result
+      setPs(prev => {
+        if (!prev) return prev;
+        const updatedQuestions = [...prev.questions];
+        updatedQuestions[questionIndex] = {
+          ...updatedQuestions[questionIndex],
+          isCompleted: response.data.isCorrect,
+          score: response.data.isCorrect ? response.data.scoreChange : updatedQuestions[questionIndex].score + response.data.scoreChange,
+          attempts: response.data.attempts,
+          isFirstBlood: response.data.isFirstBlood
+        };
+        return {
+          ...prev,
+          questions: updatedQuestions,
+          totalScore: response.data.psScore
+        };
+      });
+
+      if (response.data.isCorrect) {
+        toast.success(response.data.message);
+        // Move to next unanswered question
+        const nextUnanswered = ps?.questions.findIndex((q, i) => i > questionIndex && !q.isCompleted);
+        if (nextUnanswered !== undefined && nextUnanswered >= 0) {
+          setOpenQuestion(nextUnanswered);
+        }
+      } else {
+        toast.error(response.data.message);
       }
       
-      await api.post(`/user/ps/${psNumber}/submit`, { content });
-      router.push('/user/dashboard?success=Challenge submitted successfully!');
+      // Clear the answer field
+      setAnswers(prev => ({ ...prev, [questionIndex]: '' }));
+      
     } catch (error: any) {
-      console.error('Failed to submit:', error);
-      const message = error.response?.data?.message || 'Failed to submit challenge';
+      console.error('Failed to submit answer:', error);
+      const message = error.response?.data?.message || 'Failed to check answer';
       toast.error(message);
-      setSubmitting(false);
+    } finally {
+      setSubmittingQuestion(null);
     }
   };
 
-  const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const toggleHint = (index: number) => {
+    setShowHints(prev => ({ ...prev, [index]: !prev[index] }));
   };
+
+  const completedCount = ps?.questions.filter(q => q.isCompleted).length || 0;
+  const totalQuestions = ps?.questions.length || 12;
 
   if (loading || authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-black">
         <LoaderFive text="Loading" />
       </div>
     );
@@ -215,13 +171,11 @@ export default function PSPage({ params }: { params: Promise<{ number: string }>
 
   if (!ps) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">Problem statement not found</div>
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="text-xl text-white">Problem statement not found</div>
       </div>
     );
   }
-
-  const isCompleted = ps.submission?.isCompleted;
 
   return (
     <>
@@ -231,23 +185,30 @@ export default function PSPage({ params }: { params: Promise<{ number: string }>
         <nav className="sticky top-0 z-50 bg-neutral-900/80 backdrop-blur-xl border-b border-neutral-800/50 rounded-b-3xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
-              <h1 className="text-lg font-semibold text-white">Problem Statement {psNumber}</h1>
-              
               <div className="flex items-center gap-4">
-                {/* Timer */}
-                <div className="flex items-center gap-3 px-4 py-2 bg-neutral-800/50 border border-neutral-700/50 rounded-xl">
-                  <Clock className="w-4 h-4 text-blue-400" />
-                  <TimerDisplay elapsedTime={elapsedTime} />
-                </div>
-                
                 <button
                   onClick={() => router.push('/user/dashboard')}
-                  className="group/btn relative flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-neutral-800/50 hover:bg-neutral-700/50 border border-neutral-700/50 text-neutral-300 hover:text-white transition-all"
+                  className="p-2 text-neutral-400 hover:text-white transition-colors"
                 >
-                  <span className="hidden sm:inline">Back to</span>
-                  <span>Dashboard</span>
-                  <BottomGradient />
+                  <ArrowLeft className="w-5 h-5" />
                 </button>
+                <div>
+                  <h1 className="text-lg font-semibold text-white">{ps.title}</h1>
+                  <p className="text-xs text-neutral-500">Problem Statement {psNumber}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                {/* Progress */}
+                <div className="flex items-center gap-3 px-4 py-2 bg-neutral-800/50 border border-neutral-700/50 rounded-xl">
+                  <Trophy className="w-4 h-4 text-yellow-400" />
+                  <span className="text-sm text-white font-medium">{completedCount}/{totalQuestions}</span>
+                </div>
+                
+                {/* Score */}
+                <Badge variant="outline" className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-cyan-500/50 text-cyan-400 px-4 py-2">
+                  {ps.totalScore > 0 ? '+' : ''}{ps.totalScore} pts
+                </Badge>
               </div>
             </div>
           </div>
@@ -255,94 +216,160 @@ export default function PSPage({ params }: { params: Promise<{ number: string }>
 
         {/* Main Content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-8rem)]">
-            {/* Problem Description */}
-            <Card className="bg-neutral-900/50 border-neutral-800/50 backdrop-blur-sm overflow-hidden flex flex-col min-h-0">
-              <CardHeader className="border-b border-neutral-800/50 pb-4 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <CardTitle className="text-lg text-white">{ps.title}</CardTitle>
-                      <p className="text-xs text-neutral-500 mt-0.5">Problem Statement</p>
-                    </div>
-                  </div>
-                </div>
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            {/* Problem Description - Left Side */}
+            <Card className="lg:col-span-2 bg-neutral-900/50 border-neutral-800/50 backdrop-blur-sm h-fit lg:sticky lg:top-24">
+              <CardHeader className="border-b border-neutral-800/50 pb-4">
+                <CardTitle className="text-lg text-white flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                  Scenario
+                </CardTitle>
               </CardHeader>
-              <div className="flex-1 overflow-hidden">
-                <ScrollArea className="h-full">
-                  <div className="prose prose-invert prose-sm max-w-none py-4 px-6">
-                    <p className="text-neutral-300 whitespace-pre-wrap leading-relaxed text-sm">{ps.description}</p>
-                    {ps.details && (
-                      <div className="mt-6">
-                        <h4 className="text-sm font-semibold text-neutral-200 mb-3 flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-                          Incident Details
-                        </h4>
-                        <div className="bg-neutral-950/50 border border-neutral-800/50 rounded-lg p-4 overflow-x-auto">
-                          <pre className="text-neutral-400 text-xs font-mono">{JSON.stringify(ps.details, null, 2)}</pre>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
-              </div>
+              <ScrollArea className="h-[calc(100vh-16rem)]">
+                <CardContent className="py-4">
+                  <p className="text-neutral-300 whitespace-pre-wrap leading-relaxed text-sm">
+                    {ps.description}
+                  </p>
+                </CardContent>
+              </ScrollArea>
             </Card>
 
-            {/* Editor Section */}
-            <div className="flex flex-col gap-4 min-h-0">
-              <Card className="bg-neutral-900/50 border-neutral-800/50 backdrop-blur-sm flex-1 overflow-hidden flex flex-col min-h-0">
-                <CardHeader className="border-b border-neutral-800/50 pb-4 flex-shrink-0">
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <CardTitle className="text-lg text-white">Your Report</CardTitle>
-                      <p className="text-xs text-neutral-500 mt-0.5">Write your analysis and findings</p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <div className="flex-1 overflow-hidden min-h-0">
-                  <ScrollArea className="h-full">
-                    <div id="editorjs" className="prose prose-invert prose-sm max-w-none min-h-[200px] py-4 px-6"></div>
-                  </ScrollArea>
-                </div>
-              </Card>
+            {/* Questions - Right Side */}
+            <div className="lg:col-span-3 space-y-3">
+              <h2 className="text-xl font-bold text-white mb-4">Questions</h2>
+              
+              {ps.questions.map((question, index) => (
+                <Collapsible
+                  key={index}
+                  open={openQuestion === index}
+                  onOpenChange={(open) => setOpenQuestion(open ? index : null)}
+                >
+                  <Card className={cn(
+                    "bg-neutral-900/50 border-neutral-800/50 backdrop-blur-sm transition-all duration-200",
+                    question.isCompleted && "border-green-500/30 bg-green-900/10",
+                    openQuestion === index && "ring-1 ring-neutral-700"
+                  )}>
+                    <CollapsibleTrigger asChild>
+                      <CardHeader className="cursor-pointer hover:bg-neutral-800/30 transition-colors py-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {/* Question Number */}
+                            <div className={cn(
+                              "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
+                              question.isCompleted 
+                                ? "bg-green-500/20 text-green-400" 
+                                : "bg-neutral-800 text-neutral-400"
+                            )}>
+                              {question.isCompleted ? <Check className="w-4 h-4" /> : index + 1}
+                            </div>
+                            
+                            <div className="flex-1">
+                              <p className={cn(
+                                "text-sm font-medium line-clamp-1",
+                                question.isCompleted ? "text-green-400" : "text-white"
+                              )}>
+                                {question.question}
+                              </p>
+                              {question.isCompleted && (
+                                <div className="flex items-center gap-2 mt-1">
+                                  {question.isFirstBlood && (
+                                    <Badge className="bg-red-500/20 text-red-400 border-red-500/50 text-xs py-0">
+                                      <Droplet className="w-3 h-3 mr-1" />
+                                      First Blood
+                                    </Badge>
+                                  )}
+                                  <span className="text-xs text-green-400">+{question.score} pts</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            {question.attempts > 0 && !question.isCompleted && (
+                              <span className="text-xs text-neutral-500">{question.attempts} attempt{question.attempts > 1 ? 's' : ''}</span>
+                            )}
+                            {openQuestion === index ? (
+                              <ChevronUp className="w-5 h-5 text-neutral-400" />
+                            ) : (
+                              <ChevronDown className="w-5 h-5 text-neutral-400" />
+                            )}
+                          </div>
+                        </div>
+                      </CardHeader>
+                    </CollapsibleTrigger>
+                    
+                    <CollapsibleContent>
+                      <CardContent className="pt-0 pb-4 px-6 space-y-4">
+                        {/* Full Question */}
+                        <div className="p-4 bg-neutral-800/50 rounded-lg border border-neutral-700/50">
+                          <p className="text-neutral-200 text-sm">{question.question}</p>
+                        </div>
 
-              {/* Submit Section */}
-              <Card className="bg-neutral-900/50 border-neutral-800/50 backdrop-blur-sm">
-                <CardContent className="py-4 px-6">
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={isCompleted || submitting}
-                    className={cn(
-                      "w-full h-11 text-sm font-semibold rounded-lg transition-all duration-300",
-                      isCompleted 
-                        ? "bg-neutral-800 text-neutral-500 cursor-not-allowed border border-neutral-700" 
-                        : "bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30"
-                    )}
-                  >
-                    {isCompleted ? (
-                      <span className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-neutral-500"></span>
-                        Already Submitted
-                      </span>
-                    ) : submitting ? (
-                      <span className="flex items-center gap-2">
-                        <Spinner className="size-4" />
-                        Submitting Report...
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        <Send className="w-4 h-4" />
-                        Submit Report
-                      </span>
-                    )}
-                  </Button>
-                  {isCompleted && (
-                    <p className="text-center text-xs text-neutral-500 mt-3">
-                      You have already submitted this challenge
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
+                        {/* Hint Section */}
+                        <div>
+                          <button
+                            onClick={() => toggleHint(index)}
+                            className="flex items-center gap-2 text-sm text-neutral-400 hover:text-neutral-300 transition-colors"
+                          >
+                            <HelpCircle className="w-4 h-4" />
+                            {showHints[index] ? 'Hide Hint' : 'Show Hint'}
+                          </button>
+                          {showHints[index] && (
+                            <div className="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                              <p className="text-sm text-yellow-200">{question.hint}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Answer Input */}
+                        {!question.isCompleted ? (
+                          <div className="flex gap-3">
+                            <Input
+                              value={answers[index] || ''}
+                              onChange={(e) => setAnswers(prev => ({ ...prev, [index]: e.target.value }))}
+                              placeholder={question.placeholder}
+                              className="flex-1 bg-neutral-800/50 border-neutral-700 text-white placeholder:text-neutral-500 focus-visible:ring-cyan-500"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !submittingQuestion) {
+                                  handleSubmitAnswer(index);
+                                }
+                              }}
+                            />
+                            <Button
+                              onClick={() => handleSubmitAnswer(index)}
+                              disabled={submittingQuestion === index || !answers[index]?.trim()}
+                              className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-6"
+                            >
+                              {submittingQuestion === index ? (
+                                <Spinner className="w-4 h-4" />
+                              ) : (
+                                'Submit'
+                              )}
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                            <Check className="w-5 h-5 text-green-400" />
+                            <span className="text-green-400 text-sm font-medium">
+                              Solved! {question.isFirstBlood ? '🩸 First Blood!' : ''} (+{question.score} pts)
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Attempts and Score Info */}
+                        {question.attempts > 0 && !question.isCompleted && (
+                          <div className="flex items-center justify-between text-xs text-neutral-500">
+                            <span>{question.attempts} attempt{question.attempts > 1 ? 's' : ''}</span>
+                            {question.score < 0 && (
+                              <span className="text-red-400">Penalty: {question.score} pts</span>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              ))}
             </div>
           </div>
         </div>
