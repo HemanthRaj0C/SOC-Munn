@@ -10,14 +10,6 @@ import { cn } from '@/lib/utils';
 import { toast, Toaster } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 
-const BottomGradient = () => {
-  return (
-    <>
-      <span className="absolute inset-x-0 -bottom-px block h-px w-full bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-0 transition duration-500 group-hover/btn:opacity-100" />
-      <span className="absolute inset-x-10 -bottom-px mx-auto block h-px w-1/2 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-0 blur-sm transition duration-500 group-hover/btn:opacity-100" />
-    </>
-  );
-};
 
 interface ProblemStatement {
   psNumber: number;
@@ -122,18 +114,11 @@ export default function UserDashboard() {
             <div className="flex items-center justify-between h-16">
               <h1 className="text-2xl font-bold text-white">SOC CTF Challenge</h1>
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3">
-                  <span className="text-neutral-300 text-sm sm:text-base">{teamName}</span>
-                  <Badge variant="outline" className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-cyan-500/50 text-cyan-400">
-                    {totalScore} pts
-                  </Badge>
-                </div>
                 <button
                   onClick={logout}
-                  className="group/btn relative px-4 py-2 text-sm rounded-md bg-gradient-to-br from-red-900 to-red-600 font-medium text-white shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] hover:from-red-800 hover:to-red-500 transition-all"
+                  className="group/btn relative px-4 py-2 text-sm rounded-md bg-linear-to-br from-red-900 to-red-600 font-medium text-white shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] hover:from-red-800 hover:to-red-500 transition-all cursor-pointer"
                 >
                   Logout
-                  <BottomGradient />
                 </button>
               </div>
             </div>

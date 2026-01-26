@@ -28,15 +28,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import confetti from 'canvas-confetti';
 
-const BottomGradient = () => {
-  return (
-    <>
-      <span className="absolute inset-x-0 -bottom-px block h-px w-full bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-0 transition duration-500 group-hover/btn:opacity-100" />
-      <span className="absolute inset-x-10 -bottom-px mx-auto block h-px w-1/2 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-0 blur-sm transition duration-500 group-hover/btn:opacity-100" />
-    </>
-  );
-};
 
 interface Question {
   index: number;
@@ -68,6 +61,15 @@ export default function PSPage({ params }: { params: Promise<{ number: string }>
   const [submittingQuestion, setSubmittingQuestion] = useState<number | null>(null);
   const [openQuestion, setOpenQuestion] = useState<number | null>(0);
   const [showHints, setShowHints] = useState<{ [key: number]: boolean }>({});
+
+  const BottomGradient = () => {
+  return (
+    <>
+      <span className="absolute inset-x-0 -bottom-px block h-px w-full bg-linear-to-r from-transparent via-cyan-500 to-transparent opacity-0 transition duration-500 group-hover/btn:opacity-100" />
+      <span className="absolute inset-x-10 -bottom-px mx-auto block h-px w-1/2 bg-linear-to-r from-transparent via-indigo-500 to-transparent opacity-0 blur-sm transition duration-500 group-hover/btn:opacity-100" />
+    </>
+  );
+};
 
   useEffect(() => {
     if (authLoading) return;
@@ -102,6 +104,14 @@ export default function PSPage({ params }: { params: Promise<{ number: string }>
     }
   };
 
+  const triggerConfetti = () => {
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 }
+    });
+  };
+
   const handleSubmitAnswer = async (questionIndex: number) => {
     const answer = answers[questionIndex]?.trim();
     if (!answer) {
@@ -132,6 +142,8 @@ export default function PSPage({ params }: { params: Promise<{ number: string }>
       });
 
       if (response.data.isCorrect) {
+        // Trigger confetti on correct answer
+        triggerConfetti();
         toast.success(response.data.message);
         // Move to next unanswered question
         const nextUnanswered = ps?.questions.findIndex((q, i) => i > questionIndex && !q.isCompleted);
@@ -204,11 +216,6 @@ export default function PSPage({ params }: { params: Promise<{ number: string }>
                   <Trophy className="w-4 h-4 text-yellow-400" />
                   <span className="text-sm text-white font-medium">{completedCount}/{totalQuestions}</span>
                 </div>
-                
-                {/* Score */}
-                <Badge variant="outline" className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-cyan-500/50 text-cyan-400 px-4 py-2">
-                  {ps.totalScore > 0 ? '+' : ''}{ps.totalScore} pts
-                </Badge>
               </div>
             </div>
           </div>
@@ -246,11 +253,12 @@ export default function PSPage({ params }: { params: Promise<{ number: string }>
                 >
                   <Card className={cn(
                     "bg-neutral-900/50 border-neutral-800/50 backdrop-blur-sm transition-all duration-200",
+                    openQuestion !== index && "hover:bg-neutral-700/30",
                     question.isCompleted && "border-green-500/30 bg-green-900/10",
                     openQuestion === index && "ring-1 ring-neutral-700"
                   )}>
                     <CollapsibleTrigger asChild>
-                      <CardHeader className="cursor-pointer hover:bg-neutral-800/30 transition-colors py-4">
+                      <CardHeader className="cursor-pointer transition-colors py-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             {/* Question Number */}
@@ -270,17 +278,6 @@ export default function PSPage({ params }: { params: Promise<{ number: string }>
                               )}>
                                 {question.question}
                               </p>
-                              {question.isCompleted && (
-                                <div className="flex items-center gap-2 mt-1">
-                                  {question.isFirstBlood && (
-                                    <Badge className="bg-red-500/20 text-red-400 border-red-500/50 text-xs py-0">
-                                      <Droplet className="w-3 h-3 mr-1" />
-                                      First Blood
-                                    </Badge>
-                                  )}
-                                  <span className="text-xs text-green-400">+{question.score} pts</span>
-                                </div>
-                              )}
                             </div>
                           </div>
                           
@@ -323,12 +320,12 @@ export default function PSPage({ params }: { params: Promise<{ number: string }>
 
                         {/* Answer Input */}
                         {!question.isCompleted ? (
-                          <div className="flex gap-3">
+                          <div className="flex flex-col gap-3">
                             <Input
                               value={answers[index] || ''}
                               onChange={(e) => setAnswers(prev => ({ ...prev, [index]: e.target.value }))}
                               placeholder={question.placeholder}
-                              className="flex-1 bg-neutral-800/50 border-neutral-700 text-white placeholder:text-neutral-500 focus-visible:ring-cyan-500"
+                              className="w-full bg-neutral-800/50 border-neutral-700 text-white placeholder:text-neutral-500 focus-visible:ring-cyan-500 h-11"
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !submittingQuestion) {
                                   handleSubmitAnswer(index);
@@ -338,20 +335,21 @@ export default function PSPage({ params }: { params: Promise<{ number: string }>
                             <Button
                               onClick={() => handleSubmitAnswer(index)}
                               disabled={submittingQuestion === index || !answers[index]?.trim()}
-                              className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-6"
+                              className="group/btn relative block h-10 w-fit px-6 mx-auto rounded-md bg-linear-to-br font-medium text-white bg-zinc-800 from-zinc-900 to-zinc-900 shadow-[0px_1px_0px_0px_#27272a_inset,0px_-1px_0px_0px_#27272a_inset] cursor-pointer"
                             >
                               {submittingQuestion === index ? (
                                 <Spinner className="w-4 h-4" />
                               ) : (
                                 'Submit'
                               )}
+                              <BottomGradient />
                             </Button>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
                             <Check className="w-5 h-5 text-green-400" />
                             <span className="text-green-400 text-sm font-medium">
-                              Solved! {question.isFirstBlood ? '🩸 First Blood!' : ''} (+{question.score} pts)
+                              Solved!
                             </span>
                           </div>
                         )}
