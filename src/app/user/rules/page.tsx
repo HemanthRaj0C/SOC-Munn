@@ -19,7 +19,9 @@ import {
   CheckCircle,
   XCircle,
   Droplet,
-  BookOpen
+  BookOpen,
+  Download,
+  Server
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -182,6 +184,58 @@ export default function RulesPage() {
             </motion.div>
           ))}
         </div>
+
+        {/* Download Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="mt-12"
+        >
+          <Card className="bg-neutral-900/50 border-neutral-800/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3 text-xl">
+                <div className="p-2 rounded-lg bg-green-500/10">
+                  <Download className="w-6 h-6 text-green-400" />
+                </div>
+                <span className="text-white font-mono">DOWNLOAD RESOURCES</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-neutral-400 text-sm mb-6">
+                Download the required resources to complete the challenges. You can either download the VM image or use the local server.
+              </p>
+              <div className="flex flex-wrap gap-4">
+                {/* VM Download Button */}
+                <a
+                  href="https://drive.google.com/your-vm-link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group/btn relative px-6 py-3 text-sm rounded-md bg-neutral-800/50 font-medium text-white shadow-[0px_1px_1px_1px_#ffffff40_inset,0px_0px_0px_0px_#ffffff40_inset] transition-all cursor-pointer font-mono flex items-center gap-2 hover:bg-neutral-700/50"
+                >
+                  <Download className="w-4 h-4" />
+                  DOWNLOAD VM IMAGE
+                  <BottomGradient />
+                </a>
+                
+                {/* Local Server Download Button */}
+                <a
+                  href="http://localhost:8000"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group/btn relative px-6 py-3 text-sm rounded-md bg-neutral-800/50 font-medium text-white shadow-[0px_1px_1px_1px_#ffffff40_inset,0px_0px_0px_0px_#ffffff40_inset] transition-all cursor-pointer font-mono flex items-center gap-2 hover:bg-neutral-700/50"
+                >
+                  <Server className="w-4 h-4" />
+                  LOCAL SERVER DOWNLOAD
+                  <BottomGradient />
+                </a>
+              </div>
+              <p className="text-neutral-500 text-xs mt-4 font-mono">
+                Note: Local server requires the host to run &quot;py -m http.server&quot; on the network.
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Start Button */}
         <motion.div
