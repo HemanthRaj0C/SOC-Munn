@@ -68,7 +68,7 @@ export default function RulesPage() {
     {
       icon: Users,
       title: "Team Participation",
-      description: "Each team can have up to 3 members. All team members must be registered before the challenge begins."
+      description: "Each team can have up to 2 members. All team members must be registered before the challenge begins."
     },
     {
       icon: FileText,
@@ -220,7 +220,7 @@ export default function RulesPage() {
                 
                 {/* Local Server Download Button */}
                 <a
-                  href="http://192.168.137.160:8080/Ubutu-22%20%28Revil%29%201.ova"
+                  href="http://172.16.17.54:8080/Ubutu-22%20%28Revil%29%201.ova"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group/btn relative px-6 py-3 text-sm rounded-md bg-neutral-800/50 font-medium text-white shadow-[0px_1px_1px_1px_#ffffff40_inset,0px_0px_0px_0px_#ffffff40_inset] transition-all cursor-pointer font-mono flex items-center gap-2 hover:bg-neutral-700/50"
